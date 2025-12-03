@@ -1,0 +1,397 @@
+---
+title: "MERS Korea 2015 - Marta Smith"
+output:
+  word_document: default
+  pdf_document: default
+date: "2025-12-01"
+---
+
+# Introduction
+
+In this R Markdown, I analyze the `mers_korea_2015` data set from the "outbreaks" package.
+
+## Loading packages
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2) # ggplot()
+library(outbreaks) # data(mers_korea_2015)
+library(forcats) # to use fct_infreq
+```
+
+## Loading and inspecting the data
+
+```{r}
+# loadind the raw data
+data("mers_korea_2015")
+```
+
+### Quick questions
+
+a)  What object class is `mers_korea_2015` in R? Describe what this class is like, and how is it different from a simple atomic type in R (like a `string` like "hello world!" or a `logical` value like `true`) or a vector type defined with `c()`
+
+```{r}
+# inspecting the raw data
+class(mers_korea_2015) # this is a list that contains 2 data sets
+class(mers_korea_2015$linelist) # class type = "data.frame"
+class(mers_korea_2015$contacts) # class type = "data.frame"
+```
+
+b)  What sub-items exist within this item?
+
+```{r}
+length(mers_korea_2015) # number of elements the list contains
+names(mers_korea_2015) # names of the elements of the list
+str(mers_korea_2015) # structure function
+```
+
+c)  How can one access the sub-items within the `mers_korea_2015`?
+
+```{r}
+# separating the data sets
+# I can access them through the $ symbol
+# I decided to create variables for each data set
+linelist <- mers_korea_2015$linelist
+contacts <-mers_korea_2015$contacts
+```
+
+The "sub-items" within `mers_korea_2015` are different data sets within our project. Play with them! Open them, plot graphs, get your hands dirty. The questions won't always tell you what data set to use! So know what you're starting with, to make sure that you can
+
+# Analyses
+
+## Getting my hands dirty with the data
+
+```{r}
+# creating a summarized data frame
+admissions_summary <- linelist %>%
+  group_by(dt_report, sex) %>%
+  summarise(
+    count = n(),
+    mean_age = mean(age, na.rm= TRUE),
+    .groups = 'drop'
+  )
+admissions_summary
+
+ggplot(admissions_summary) + 
+  geom_line(aes(x=dt_report, y=count)) # first attempt at a line chart
+
+
+# Pivot table by ages per date of report
+pivot_age <- admissions_summary %>%
+  pivot_wider(
+    id_cols = dt_report, # columns
+    names_from = sex, # names of the column
+    values_from = mean_age, # values
+    names_prefix = "mean_age_" # optional
+  ) 
+
+pivot_age
+
+
+# count of admissions by the number of week
+admissions_by_week <- ggplot(linelist) + 
+  geom_bar(aes(x=week_report), fill="gray", color="black") + # color is used for the outline
+  theme_minimal() +
+  labs(
+    title="MERS admissions by week",
+    x="Week",
+    y="Admissions"
+  )
+admissions_by_week
+
+# admissions by date of report
+admissions_by_dt_report <- ggplot(linelist) + 
+  geom_bar(aes(x=dt_report), fill="gray", color="black") + # color is used for the outline
+  theme_minimal() +
+  labs(
+    title="MERS admissions by date of report",
+    x="Date of Report",
+    y="Admissions"
+  )
+admissions_by_dt_report
+
+# first approach to understand the average age of the two populations
+age_by_outcome <- ggplot(linelist) + 
+  geom_violin(aes(x=outcome, y=age, fill=outcome)) + 
+  theme_minimal() +
+  labs(title="",
+       x="Outcome", y="Age",fill="Outcome")
+age_by_outcome
+
+## ERROR HERE!! Needs reworking
+# count of admissions by week - line chart
+weekly_cases <- linelist %>%
+  count(dt_report, name="weekly_count") %>%
+  filter(!is.na(dt_report)) %>% # to remove NAs
+  mutate(
+    dt_report = as.numeric(as.character(dt_report)),
+    weekly_count = as.numeric(weekly_count)) # Convierte el integer a numeric
+
+ggplot(weekly_cases) +
+  geom_line(aes(x=dt_report, y=weekly_cases))
+
+```
+
+## 1. Demographics
+
+a)  Calculate the **average age** for patients with the outcome "Dead" and patients with the outcome "Alive."
+
+```{r}
+# summary table
+summary_age <- linelist %>%
+  group_by(outcome) %>%
+  summarise(
+    count = n(),
+    mean_age = mean(age, na.rm= TRUE),
+    std_age = sd(age, na.rm = TRUE),
+    .groups = 'drop'
+  )
+summary_age
+
+# ggplot for the average age of the two populations
+age_by_outcome <- ggplot(linelist) + 
+  geom_violin(aes(x=outcome, y=age, fill=outcome)) + 
+  theme_minimal() +
+  labs(title="",
+       x="Outcome", y="Age",fill="Outcome")
+
+age_by_outcome
+```
+
+b)  Based on first impressions, does age seem to be a determinant of mortality in this outbreak? How might the social status of the elderly in South Korea contribute to exposure risks (e.g., care homes, hospital frequency)?
+
+On first impressions, age seems to be a determinant of mortality in the 2015 MERS outbreak in South Korea. I am applying two statistical metrics for this analysis.
+
+**Mean:** The average age of the dead group is higher than for the alive group (D: 68 yo; A: 53.6 yo). There is a gap of 14.4 years between both averages.
+
+**Standard Deviation:** The standard deviation is 56% lower in the Dead group with respect to the Alive group (D: 8.9; A: 15.8). This shows that the data points for the Dead group are closer to the mean.
+
+**More context:** The deceased group represents 11.7% of the data set. It's also interesting that the 3 super spreaders are males with an average age of 35 yo (more on the super-spreader section).
+
+Elders are highly valued in Korea. "At the core of the Korean family system is respect for elders and filial piety. Elders are valued for their experience and wisdom; they are consulted for advice, support, and resolution of family conflicts." (Lee YM, Holm K. Family Relationships and Depression among Elderly Korean Immigrants. ISRN Nurs. 2011;2011:429249. doi: 10.5402/2011/429249. Epub 2011 Jun 16. PMID: 22007321; PMCID: PMC3169852.)
+
+c\. Name two social factors or behaviours you would expect from the sampled demographic that would increase the likelihood of exposure to MERS-CoV (particularly for the elderly population). Am example could be "hospital hopping" where patients visit multiple hospitals to see different medical professionals.
+
+Too many cases in the same hospital (emergency rooms where beds are only separated by curtains) (PTSM)
+
+An emergency room visit for another medical condition might have exposed the cases.
+
+```{r}
+# understanding the elderly population's behavior
+elderly <- linelist %>%
+  filter(age >= 60)
+elderly
+
+elderly_dist <- ggplot(elderly) + 
+  geom_histogram(aes(x=age, fill=sex), binwidth=1) +
+  labs(
+    x="Age",
+    y="Frequency",
+    fill="Sex"
+  ) +
+  theme_minimal()
+elderly_dist
+
+
+# distribution across hospitals
+ggplot(linelist) + 
+  geom_bar(
+    aes(x = fct_infreq(loc_hosp) ),
+    fill = "#0072B2" ) +
+  labs(
+    title = "Frequency count",
+    x = "Local hospital",
+    y = "Frequency"
+  ) +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # changing the text's angle
+
+# distribution across hospitals (elderly)
+ggplot(elderly) + 
+  geom_bar(
+    aes(x = fct_infreq(loc_hosp) ),
+    fill = "#0072B2" ) +
+  labs(
+    title = "Frequency count of elderly",
+    x = "Local hospital",
+    y = "Frequency"
+  ) +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # changing the text's angle
+```
+
+d\. Synthesize your statistical finding with your identified social factors and behaviours to explain how **social status and norms** acted as an **amplifier** of the biological risk posed by age. Maybe it's a good time to look into Korean culture too!
+
+```{r}
+
+```
+
+e\. Repeat task (d) but with the following points: saturated emergency rooms and family caregiving, common in Korea, where there is a cultural expectation for family members (usually younger women or older teens) to stay in the patient's room providing simple emotional and practical support.
+
+```{r}
+exposures <- contacts %>%
+  group_by(exposure) %>%
+  summarise (
+    count = n() ) %>%
+  arrange(desc(count))
+exposures
+
+ggplot(contacts) + 
+  geom_bar(aes(x = fct_infreq(exposure)), fill="lightgreen") +
+  labs(
+    x="Exposure Type",
+    y="Cases" ) + 
+  theme_minimal()
+```
+
+## **2. Institutional Analysis**
+
+a)  Calculate the median reporting lag from the original variables provided. On average, how many days were people sick and potentially interacting with their social networks before the institution 'captured' them?
+
+b)  Analyse your new variable as a function of time. What does the trend tell you about the institution's ability to 'learn' and mobilize resources over time?
+
+c)  In MERS outbreaks in the Middle East, men were infected much more often. In this South Korean outbreak, is there a gender imbalance? What could this imply about the gender demographics of caregiving in Korean hospitals?
+
+*Bonus* - investigate why there were more male than female cases in the middle east spread of MERS. Why would this not apply in Korea?
+
+## **3. The Super-Spreader**
+
+a)  Using the appropriate data set, calculate the number of infections attributed to each case. Calculate the mean and the maximum of this variable. What is the ratio between the maximum "infector" and the average?
+
+For this analysis, I will categorize the super-spreader as those cases that infected 5 or more other cases.
+
+Based on the Contacts data set and the previous assumption, we can identify 10 spreaders in this outbreak, and 3 of those are super-spreaders: SK_14, SK_1, and SK_16. These 3 super-spreaders are males with an average age of 35 years old and located in the Pyeongtaek St. Mary Hospital (PTSM).
+
+The 3 super-spreaders were responsible for 85 infections (52%).
+
+```{r}
+# count of infections caused by each spreader
+all_cases <- nrow(linelist)
+
+spreader_count <- contacts %>%
+  group_by(from) %>%
+  summarise(
+    infections = n(),
+    percentage_of_infections = infections / all_cases * 100,
+    .groups = 'drop' ) %>%
+  arrange(desc(infections))
+spreader_count
+
+# how did these spreaders infect the other cases?
+superspreaders <- contacts %>%
+  group_by(from,
+           exposure) %>%
+  summarise(
+    infections = n(),
+    percentage_of_infections = infections / all_cases * 100,
+    .groups = 'drop') %>%
+  arrange(desc(infections))
+superspreaders
+
+superspreaders_pivot <- superspreaders %>%
+  filter(infections >= 5) %>%
+  pivot_wider(
+    id_cols = from,
+    names_from = exposure,
+    values_from = infections
+  )
+superspreaders_pivot
+```
+
+```{r}
+# What is the ratio between the maximum "infector" and the average?
+# formula for a ratio = max / average
+
+# calculating the max
+max_infector_count <- max(spreader_count$infections, na.rm = TRUE)
+max_infector_count
+
+# calculating the average
+avg_spreader_count <- mean(spreader_count$infections, na.rm = TRUE) # 8.9 cases in average
+avg_spreader_count
+
+# calculating the ratio
+ratio <- max_infector_count / avg_spreader_count
+ratio
+```
+
+b)  Visualise the distribution of secondary cases. What does the shape of your plot imply about how "democratic" or "equal" disease transmission was in this specific sample?
+
+```{r}
+
+```
+
+c)  Summarise the demographic profile of the "super spreader" using both datasets. Based on where they were infected and their demographic profile, hypothesize a social reason why this specific individual had such a high number of secondary cases.
+
+```{r}
+# left join to dig deeper into the superspreaders' details
+superspreaders_deep <- superspreaders %>%
+  rename(id = from) %>%   # rename 'from' to 'id'
+  left_join(linelist, by = "id") %>%
+  select(id,
+         age,
+         age_class,
+         sex,
+         infections,
+         percentage_of_infections,
+         place_infect,
+         reporting_ctry,
+         exposure,
+         loc_hosp,
+         outcome) %>%
+  filter(infections >= 5)
+superspreaders_deep
+```
+
+*Bonus* - Test the "Pareto Principle" (the 20/80 rule) on this data. Calculate what percentage of the total infections were caused by the top 20% of infectors. Does this outbreak fit the rule?
+
+# Appendix
+
+## Attempting to graph a transmission chain
+
+```{r}
+install.packages("pacman")
+library(pacman)
+
+pacman::p_load( # source: https://www.epirhandbook.com/en/new_pages/contact_tracing.html
+  igraph,
+  visNetwork,
+  dplyr
+)
+
+edges_df <- contacts %>%
+  # Filter out rows where the contact is unknown (NA) if necessary
+  filter(!is.na(from), !is.na(to)) %>%
+  # Select and rename columns for igraph/visNetwork standard: from/to
+  select(
+    from = from, 
+    to = to
+  ) %>%
+  # Remove duplicate edges, if any (e.g., if multiple contacts recorded between the same pair)
+  distinct()
+
+
+# Make sure 'from' and 'to' in edges_df are characters to match 'id' in nodes_df
+edges_df <- edges_df %>% 
+  mutate(
+    from = as.character(from),
+    to = as.character(to))
+
+nodes_df <- nodes_df %>%
+  mutate(
+    id = as.character(id))
+
+
+# Create the interactive visualization
+visNetwork(nodes_df, edges_df, main = "MERS-CoV Korea 2015 Transmission Chain") %>%
+  # Set up the visualization appearance
+  visNetwork(nodes_df, edges_df, main = "MERS-CoV Korea 2015 Transmission Chain") %>%
+  # visIgraphLayout(layout = "nicely") %>% # <--- ¡COMENTA ESTA LÍNEA!
+  visNodes(shape = "dot", size = 15) %>%
+  visEdges(arrows = 'to', color = 'grey') %>% # 'arrows = to' shows direction of transmission
+  visOptions(highlightNearest = TRUE,   # Add interaction options (allows dragging, zooming)
+             nodesIdSelection = TRUE,
+             selectedBy = "outcome") %>%
+  visLegend(main = "Outcome", position = "right")  # Add legend for outcome colors
+```
