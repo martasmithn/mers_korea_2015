@@ -1,9 +1,9 @@
 ---
 title: "MERS Korea 2015 - Marta Smith"
-output:
-  word_document: default
-  pdf_document: default
+output: md_document
 date: "2025-12-01"
+editor_options: 
+  chunk_output_type: inline
 ---
 
 # Introduction
@@ -29,7 +29,7 @@ data("mers_korea_2015")
 
 ### Quick questions
 
-a)  What object class is `mers_korea_2015` in R? Describe what this class is like, and how is it different from a simple atomic type in R (like a `string` like "hello world!" or a `logical` value like `true`) or a vector type defined with `c()`
+a) What object class is `mers_korea_2015` in R? Describe what this class is like, and how is it different from a simple atomic type in R (like a `string` like "hello world!" or a `logical` value like `true`) or a vector type defined with `c()`
 
 ```{r}
 # inspecting the raw data
@@ -38,7 +38,7 @@ class(mers_korea_2015$linelist) # class type = "data.frame"
 class(mers_korea_2015$contacts) # class type = "data.frame"
 ```
 
-b)  What sub-items exist within this item?
+b) What sub-items exist within this item?
 
 ```{r}
 length(mers_korea_2015) # number of elements the list contains
@@ -46,7 +46,7 @@ names(mers_korea_2015) # names of the elements of the list
 str(mers_korea_2015) # structure function
 ```
 
-c)  How can one access the sub-items within the `mers_korea_2015`?
+c) How can one access the sub-items within the `mers_korea_2015`?
 
 ```{r}
 # separating the data sets
@@ -135,7 +135,7 @@ ggplot(weekly_cases) +
 
 ## 1. Demographics
 
-a)  Calculate the **average age** for patients with the outcome "Dead" and patients with the outcome "Alive."
+a) Calculate the **average age** for patients with the outcome "Dead" and patients with the outcome "Alive."
 
 ```{r}
 # summary table
@@ -159,7 +159,7 @@ age_by_outcome <- ggplot(linelist) +
 age_by_outcome
 ```
 
-b)  Based on first impressions, does age seem to be a determinant of mortality in this outbreak? How might the social status of the elderly in South Korea contribute to exposure risks (e.g., care homes, hospital frequency)?
+b) Based on first impressions, does age seem to be a determinant of mortality in this outbreak? How might the social status of the elderly in South Korea contribute to exposure risks (e.g., care homes, hospital frequency)?
 
 On first impressions, age seems to be a determinant of mortality in the 2015 MERS outbreak in South Korea. I am applying two statistical metrics for this analysis.
 
@@ -169,9 +169,13 @@ On first impressions, age seems to be a determinant of mortality in the 2015 MER
 
 **More context:** The deceased group represents 11.7% of the data set. It's also interesting that the 3 super spreaders are males with an average age of 35 yo (more on the super-spreader section).
 
+[Draft:]{.underline}
+
 Elders are highly valued in Korea. "At the core of the Korean family system is respect for elders and filial piety. Elders are valued for their experience and wisdom; they are consulted for advice, support, and resolution of family conflicts." (Lee YM, Holm K. Family Relationships and Depression among Elderly Korean Immigrants. ISRN Nurs. 2011;2011:429249. doi: 10.5402/2011/429249. Epub 2011 Jun 16. PMID: 22007321; PMCID: PMC3169852.)
 
 c\. Name two social factors or behaviours you would expect from the sampled demographic that would increase the likelihood of exposure to MERS-CoV (particularly for the elderly population). Am example could be "hospital hopping" where patients visit multiple hospitals to see different medical professionals.
+
+[Draft:]{.underline}
 
 Too many cases in the same hospital (emergency rooms where beds are only separated by curtains) (PTSM)
 
@@ -247,17 +251,29 @@ ggplot(contacts) +
 
 ## **2. Institutional Analysis**
 
-a)  Calculate the median reporting lag from the original variables provided. On average, how many days were people sick and potentially interacting with their social networks before the institution 'captured' them?
+a) Calculate the median reporting lag from the original variables provided. On average, how many days were people sick and potentially interacting with their social networks before the institution 'captured' them?
 
-b)  Analyse your new variable as a function of time. What does the trend tell you about the institution's ability to 'learn' and mobilize resources over time?
+```{r}
 
-c)  In MERS outbreaks in the Middle East, men were infected much more often. In this South Korean outbreak, is there a gender imbalance? What could this imply about the gender demographics of caregiving in Korean hospitals?
+```
+
+b) Analyse your new variable as a function of time. What does the trend tell you about the institution's ability to 'learn' and mobilize resources over time?
+
+```{r}
+
+```
+
+c) In MERS outbreaks in the Middle East, men were infected much more often. In this South Korean outbreak, is there a gender imbalance? What could this imply about the gender demographics of caregiving in Korean hospitals?
+
+```{r}
+
+```
 
 *Bonus* - investigate why there were more male than female cases in the middle east spread of MERS. Why would this not apply in Korea?
 
 ## **3. The Super-Spreader**
 
-a)  Using the appropriate data set, calculate the number of infections attributed to each case. Calculate the mean and the maximum of this variable. What is the ratio between the maximum "infector" and the average?
+a) Using the appropriate data set, calculate the number of infections attributed to each case. Calculate the mean and the maximum of this variable. What is the ratio between the maximum "infector" and the average?
 
 For this analysis, I will categorize the super-spreader as those cases that infected 5 or more other cases.
 
@@ -316,13 +332,13 @@ ratio <- max_infector_count / avg_spreader_count
 ratio
 ```
 
-b)  Visualise the distribution of secondary cases. What does the shape of your plot imply about how "democratic" or "equal" disease transmission was in this specific sample?
+b) Visualise the distribution of secondary cases. What does the shape of your plot imply about how "democratic" or "equal" disease transmission was in this specific sample?
 
 ```{r}
 
 ```
 
-c)  Summarise the demographic profile of the "super spreader" using both datasets. Based on where they were infected and their demographic profile, hypothesize a social reason why this specific individual had such a high number of secondary cases.
+c) Summarise the demographic profile of the "super spreader" using both datasets. Based on where they were infected and their demographic profile, hypothesize a social reason why this specific individual had such a high number of secondary cases.
 
 ```{r}
 # left join to dig deeper into the superspreaders' details
