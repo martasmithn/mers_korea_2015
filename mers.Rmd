@@ -29,7 +29,7 @@ data("mers_korea_2015")
 
 ### Quick questions
 
-a) What object class is `mers_korea_2015` in R? Describe what this class is like, and how is it different from a simple atomic type in R (like a `string` like "hello world!" or a `logical` value like `true`) or a vector type defined with `c()`
+a)  What object class is `mers_korea_2015` in R? Describe what this class is like, and how is it different from a simple atomic type in R (like a `string` like "hello world!" or a `logical` value like `true`) or a vector type defined with `c()`
 
 ```{r}
 # inspecting the raw data
@@ -38,7 +38,7 @@ class(mers_korea_2015$linelist) # class type = "data.frame"
 class(mers_korea_2015$contacts) # class type = "data.frame"
 ```
 
-b) What sub-items exist within this item?
+b)  What sub-items exist within this item?
 
 ```{r}
 length(mers_korea_2015) # number of elements the list contains
@@ -46,7 +46,7 @@ names(mers_korea_2015) # names of the elements of the list
 str(mers_korea_2015) # structure function
 ```
 
-c) How can one access the sub-items within the `mers_korea_2015`?
+c)  How can one access the sub-items within the `mers_korea_2015`?
 
 ```{r}
 # separating the data sets
@@ -135,19 +135,29 @@ ggplot(weekly_cases) +
 
 ## 1. Demographics
 
-a) Calculate the **average age** for patients with the outcome "Dead" and patients with the outcome "Alive."
+a)  Calculate the **average age** for patients with the outcome "Dead" and patients with the outcome "Alive."
 
 ```{r}
+# age distribution (not grouped)
+age_dist <- linelist %>%
+  summarise(
+    count = n(),
+    mean_age = mean(age, na.rm= TRUE),
+    sd_age = sd(age, na.rm = TRUE),
+    .groups = 'drop'
+  )
+age_dist
+
 # summary table
-summary_age <- linelist %>%
+outcome_dist <- linelist %>%
   group_by(outcome) %>%
   summarise(
     count = n(),
     mean_age = mean(age, na.rm= TRUE),
-    std_age = sd(age, na.rm = TRUE),
+    sd_age = sd(age, na.rm = TRUE),
     .groups = 'drop'
   )
-summary_age
+outcome_dist
 
 # ggplot for the average age of the two populations
 age_by_outcome <- ggplot(linelist) + 
@@ -157,9 +167,27 @@ age_by_outcome <- ggplot(linelist) +
        x="Outcome", y="Age",fill="Outcome")
 
 age_by_outcome
+
+ggplot(linelist) +
+  # Histogram
+  geom_histogram(
+    aes(x = age, y = after_stat(density)), # y = density for overlay
+    binwidth = 5, fill = "skyblue", color = "white", alpha = 0.7 ) +
+  geom_density(
+    aes(x = age), # Solo mapeamos la edad
+    color = "red", 
+    linewidth = 1,
+    adjust = 1.5 # <--- Ajuste de suavizado. Prueba 1.5 o 2.0 para una curva suave.
+  ) +
+  geom_vline( # Average age as vertical line
+    xintercept = age_dist$mean_age,
+    color = "darkgreen",
+    linetype = "dashed",
+    linewidth = 1 ) +
+  theme_minimal()
 ```
 
-b) Based on first impressions, does age seem to be a determinant of mortality in this outbreak? How might the social status of the elderly in South Korea contribute to exposure risks (e.g., care homes, hospital frequency)?
+b)  Based on first impressions, does age seem to be a determinant of mortality in this outbreak? How might the social status of the elderly in South Korea contribute to exposure risks (e.g., care homes, hospital frequency)?
 
 On first impressions, age seems to be a determinant of mortality in the 2015 MERS outbreak in South Korea. I am applying two statistical metrics for this analysis.
 
@@ -184,7 +212,7 @@ An emergency room visit for another medical condition might have exposed the cas
 ```{r}
 # understanding the elderly population's behavior
 elderly <- linelist %>%
-  filter(age >= 60)
+  filter(age >= 65)
 elderly
 
 elderly_dist <- ggplot(elderly) + 
@@ -251,19 +279,50 @@ ggplot(contacts) +
 
 ## **2. Institutional Analysis**
 
-a) Calculate the median reporting lag from the original variables provided. On average, how many days were people sick and potentially interacting with their social networks before the institution 'captured' them?
+a)  Calculate the median reporting lag from the original variables provided. On average, how many days were people sick and potentially interacting with their social networks before the institution 'captured' them?
+
+The median reporting between the date of onset and the date of reporting is **5 days**. For 5 days, cases were interacting with other people, potentially transmitting MERS. SK_1 (one of the super-spreaders and responsible for 26 infections, had a lag of **16 days** between the onset of symptoms and their report.
+
+```{r}
+median_reporting <- linelist %>%
+  mutate (
+    lag_report = dt_report - dt_onset,
+    lag_exposures = dt_end_exp - dt_start_exp,
+    lag_diagnosis = dt_diag - dt_onset ) %>%
+  filter(
+    !is.na(lag_report),
+    !is.na(lag_exposures),
+    !is.na(lag_diagnosis)) %>%
+  reframe(
+    id = id,
+    lag_report = lag_report,
+    lag_exposures = lag_exposures,
+    lag_diagnosis = lag_diagnosis,
+    median_report = median(lag_report, na.rm = TRUE),
+    median_exposures = median(lag_exposures, na.rm = TRUE),
+    median_diagonsis = median(lag_diagnosis, na.rm = TRUE)
+  )
+median_reporting
+
+nrow(median_reporting) / nrow(linelist) # 135 out of 162. 82% of the original data set
+
+
+ggplot(median_reporting) +
+  geom_histogram(
+    aes(x=lag_report),
+    binwidth = 2, fill = "skyblue", color = "white", alpha = 0.8 ) + theme_minimal() +
+  geom_histogram(
+    aes(x=lag_diagnosis),
+    binwidth = 2, fill = "lightgreen", color = "white", alpha = 0.3 ) + theme_minimal()
+```
+
+b)  Analyse your new variable as a function of time. What does the trend tell you about the institution's ability to 'learn' and mobilize resources over time?
 
 ```{r}
 
 ```
 
-b) Analyse your new variable as a function of time. What does the trend tell you about the institution's ability to 'learn' and mobilize resources over time?
-
-```{r}
-
-```
-
-c) In MERS outbreaks in the Middle East, men were infected much more often. In this South Korean outbreak, is there a gender imbalance? What could this imply about the gender demographics of caregiving in Korean hospitals?
+c)  In MERS outbreaks in the Middle East, men were infected much more often. In this South Korean outbreak, is there a gender imbalance? What could this imply about the gender demographics of caregiving in Korean hospitals?
 
 ```{r}
 
@@ -273,7 +332,7 @@ c) In MERS outbreaks in the Middle East, men were infected much more often. In t
 
 ## **3. The Super-Spreader**
 
-a) Using the appropriate data set, calculate the number of infections attributed to each case. Calculate the mean and the maximum of this variable. What is the ratio between the maximum "infector" and the average?
+a)  Using the appropriate data set, calculate the number of infections attributed to each case. Calculate the mean and the maximum of this variable. What is the ratio between the maximum "infector" and the average?
 
 For this analysis, I will categorize the super-spreader as those cases that infected 5 or more other cases.
 
@@ -332,13 +391,13 @@ ratio <- max_infector_count / avg_spreader_count
 ratio
 ```
 
-b) Visualise the distribution of secondary cases. What does the shape of your plot imply about how "democratic" or "equal" disease transmission was in this specific sample?
+b)  Visualise the distribution of secondary cases. What does the shape of your plot imply about how "democratic" or "equal" disease transmission was in this specific sample?
 
 ```{r}
 
 ```
 
-c) Summarise the demographic profile of the "super spreader" using both datasets. Based on where they were infected and their demographic profile, hypothesize a social reason why this specific individual had such a high number of secondary cases.
+c)  Summarise the demographic profile of the "super spreader" using both datasets. Based on where they were infected and their demographic profile, hypothesize a social reason why this specific individual had such a high number of secondary cases.
 
 ```{r}
 # left join to dig deeper into the superspreaders' details
