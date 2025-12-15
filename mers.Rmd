@@ -1,8 +1,10 @@
 ---
 title: "MERS Korea 2015 - Marta Smith"
-output: md_document
+output:
+  pdf_document: default
+  html_document: default
 date: "2025-12-01"
-editor_options: 
+editor_options:
   chunk_output_type: inline
 ---
 
@@ -15,9 +17,12 @@ In this R Markdown, I analyze the `mers_korea_2015` data set from the "outbreaks
 ```{r}
 library(dplyr)
 library(tidyr)
+library(stringr)
 library(ggplot2) # ggplot()
 library(outbreaks) # data(mers_korea_2015)
 library(forcats) # to use fct_infreq
+library(lubridate) # to extract weeks from dates
+library(tinytex)
 ```
 
 ## Loading and inspecting the data
@@ -29,28 +34,35 @@ data("mers_korea_2015")
 
 ### Quick questions
 
-a)  What object class is `mers_korea_2015` in R? Describe what this class is like, and how is it different from a simple atomic type in R (like a `string` like "hello world!" or a `logical` value like `true`) or a vector type defined with `c()`
+**Q: What object class is `mers_korea_2015` in R? Describe what this class is like, and how is it different from a simple atomic type in R (like a `string` like "hello world!" or a `logical` value like `true`) or a vector type defined with `c()`**
+
+A: `mers_korea_2015` is a list. A list is a collection of data which is ordered and changeable ([source](https://www.w3schools.com/r/r_lists.asp)).
+
+**Q: What sub-items exist within this item?**
+
+A: It contains 2 sub-items that are dataframes: `linelist` and `contacts`.
+
+`linelist`: A dataframe of MERS-CoV cases and their attributes ([source](https://www.rdocumentation.org/packages/outbreaks/versions/1.1.0/topics/mers.korea.2015)). `contacts`: A dataframe describing the relationship between MERS Co-V cases ([source](https://www.rdocumentation.org/packages/outbreaks/versions/1.1.0/topics/mers.korea.2015)).
 
 ```{r}
 # inspecting the raw data
 class(mers_korea_2015) # this is a list that contains 2 data sets
-class(mers_korea_2015$linelist) # class type = "data.frame"
-class(mers_korea_2015$contacts) # class type = "data.frame"
-```
+class(mers_korea_2015$linelist)
+class(mers_korea_2015$contacts)
 
-b)  What sub-items exist within this item?
-
-```{r}
 length(mers_korea_2015) # number of elements the list contains
 names(mers_korea_2015) # names of the elements of the list
 str(mers_korea_2015) # structure function
 ```
 
-c)  How can one access the sub-items within the `mers_korea_2015`?
+**Q: How can one access the sub-items within the `mers_korea_2015`?**
 
 ```{r}
 # separating the data sets
-# I can access them through the $ symbol
+# Same ways of accessing the sub-items: either with a $ or [1]
+mers_korea_2015$linelist
+mers_korea_2015[1]
+
 # I decided to create variables for each data set
 linelist <- mers_korea_2015$linelist
 contacts <-mers_korea_2015$contacts
@@ -76,7 +88,6 @@ admissions_summary
 ggplot(admissions_summary) + 
   geom_line(aes(x=dt_report, y=count)) # first attempt at a line chart
 
-
 # Pivot table by ages per date of report
 pivot_age <- admissions_summary %>%
   pivot_wider(
@@ -85,9 +96,7 @@ pivot_age <- admissions_summary %>%
     values_from = mean_age, # values
     names_prefix = "mean_age_" # optional
   ) 
-
 pivot_age
-
 
 # count of admissions by the number of week
 admissions_by_week <- ggplot(linelist) + 
@@ -121,43 +130,46 @@ age_by_outcome
 
 ## ERROR HERE!! Needs reworking
 # count of admissions by week - line chart
-weekly_cases <- linelist %>%
-  count(dt_report, name="weekly_count") %>%
-  filter(!is.na(dt_report)) %>% # to remove NAs
-  mutate(
-    dt_report = as.numeric(as.character(dt_report)),
-    weekly_count = as.numeric(weekly_count)) # Convierte el integer a numeric
+ # weekly_cases <- linelist %>%
+  #count(dt_report, name="weekly_count") %>%
+  #filter(!is.na(dt_report)) %>% # to remove NAs
+  #mutate(
+   # dt_report = as.numeric(as.character(dt_report)),
+   # weekly_count = as.numeric(weekly_count)) # Convierte el integer a numeric
 
-ggplot(weekly_cases) +
-  geom_line(aes(x=dt_report, y=weekly_cases))
-
+#ggplot(weekly_cases) +
+ # geom_line(aes(x=dt_report, y=weekly_cases))
 ```
 
 ## 1. Demographics
 
-a)  Calculate the **average age** for patients with the outcome "Dead" and patients with the outcome "Alive."
+**Q: Calculate the average age for patients with the outcome "Dead" and patients with the outcome "Alive."**
+
+A: The average age of this sample was 55 years old. Dead cases: 68 years old; Alive cases: 53.6 years old.
 
 ```{r}
 # age distribution (not grouped)
-age_dist <- linelist %>%
+age_stats <- linelist %>%
   summarise(
     count = n(),
     mean_age = mean(age, na.rm= TRUE),
+    median_age = median(age, na.rm = TRUE),
     sd_age = sd(age, na.rm = TRUE),
     .groups = 'drop'
   )
-age_dist
+age_stats
 
-# summary table
-outcome_dist <- linelist %>%
+# summary table (grouped by outcome)
+outcome_stats <- linelist %>%
   group_by(outcome) %>%
   summarise(
     count = n(),
     mean_age = mean(age, na.rm= TRUE),
+    median_age = median(age, na.rm = TRUE),
     sd_age = sd(age, na.rm = TRUE),
     .groups = 'drop'
   )
-outcome_dist
+outcome_stats
 
 # ggplot for the average age of the two populations
 age_by_outcome <- ggplot(linelist) + 
@@ -165,33 +177,32 @@ age_by_outcome <- ggplot(linelist) +
   theme_minimal() +
   labs(title="",
        x="Outcome", y="Age",fill="Outcome")
-
 age_by_outcome
 
+# Age histogram + normal distribution + mean age
 ggplot(linelist) +
-  # Histogram
   geom_histogram(
     aes(x = age, y = after_stat(density)), # y = density for overlay
     binwidth = 5, fill = "skyblue", color = "white", alpha = 0.7 ) +
   geom_density(
-    aes(x = age), # Solo mapeamos la edad
+    aes(x = age),
     color = "red", 
     linewidth = 1,
-    adjust = 1.5 # <--- Ajuste de suavizado. Prueba 1.5 o 2.0 para una curva suave.
+    adjust = 2
   ) +
   geom_vline( # Average age as vertical line
-    xintercept = age_dist$mean_age,
+    xintercept = age_stats$mean_age,
     color = "darkgreen",
     linetype = "dashed",
     linewidth = 1 ) +
   theme_minimal()
 ```
 
-b)  Based on first impressions, does age seem to be a determinant of mortality in this outbreak? How might the social status of the elderly in South Korea contribute to exposure risks (e.g., care homes, hospital frequency)?
+**Q: Based on first impressions, does age seem to be a determinant of mortality in this outbreak? How might the social status of the elderly in South Korea contribute to exposure risks (e.g., care homes, hospital frequency)?**
 
 On first impressions, age seems to be a determinant of mortality in the 2015 MERS outbreak in South Korea. I am applying two statistical metrics for this analysis.
 
-**Mean:** The average age of the dead group is higher than for the alive group (D: 68 yo; A: 53.6 yo). There is a gap of 14.4 years between both averages.
+**Mean:** The average age of the dead group is higher than for the alive group (D: 68 yo; A: 53.6 yo). There is a gap of 14.4 years between both averages (68 vs 53.6)
 
 **Standard Deviation:** The standard deviation is 56% lower in the Dead group with respect to the Alive group (D: 8.9; A: 15.8). This shows that the data points for the Dead group are closer to the mean.
 
@@ -201,7 +212,7 @@ On first impressions, age seems to be a determinant of mortality in the 2015 MER
 
 Elders are highly valued in Korea. "At the core of the Korean family system is respect for elders and filial piety. Elders are valued for their experience and wisdom; they are consulted for advice, support, and resolution of family conflicts." (Lee YM, Holm K. Family Relationships and Depression among Elderly Korean Immigrants. ISRN Nurs. 2011;2011:429249. doi: 10.5402/2011/429249. Epub 2011 Jun 16. PMID: 22007321; PMCID: PMC3169852.)
 
-c\. Name two social factors or behaviours you would expect from the sampled demographic that would increase the likelihood of exposure to MERS-CoV (particularly for the elderly population). Am example could be "hospital hopping" where patients visit multiple hospitals to see different medical professionals.
+**Q: Name two social factors or behaviours you would expect from the sampled demographic that would increase the likelihood of exposure to MERS-CoV (particularly for the elderly population). Am example could be "hospital hopping" where patients visit multiple hospitals to see different medical professionals.**
 
 [Draft:]{.underline}
 
@@ -216,15 +227,19 @@ elderly <- linelist %>%
 elderly
 
 elderly_dist <- ggplot(elderly) + 
-  geom_histogram(aes(x=age, fill=sex), binwidth=1) +
+  geom_histogram(aes(x=age, fill=sex), binwidth=5) +
   labs(
     x="Age",
     y="Frequency",
     fill="Sex"
   ) +
+  geom_vline( # Average age as vertical line
+    xintercept = mean(elderly$age),
+    color = "darkgreen",
+    linetype = "dashed",
+    linewidth = 1 ) +
   theme_minimal()
 elderly_dist
-
 
 # distribution across hospitals
 ggplot(linelist) + 
@@ -279,22 +294,24 @@ ggplot(contacts) +
 
 ## **2. Institutional Analysis**
 
-a)  Calculate the median reporting lag from the original variables provided. On average, how many days were people sick and potentially interacting with their social networks before the institution 'captured' them?
+**Q: Calculate the median reporting lag from the original variables provided. On average, how many days were people sick and potentially interacting with their social networks before the institution 'captured' them?**
 
-The median reporting between the date of onset and the date of reporting is **5 days**. For 5 days, cases were interacting with other people, potentially transmitting MERS. SK_1 (one of the super-spreaders and responsible for 26 infections, had a lag of **16 days** between the onset of symptoms and their report.
+A: The median reporting between the date of onset and the date of reporting is 5 days. For 5 days, cases were interacting with other people, potentially transmitting MERS. SK_1 (one of the super-spreaders and responsible for 26 infections, had a lag of 16 days between the onset of symptoms and their report.
 
 ```{r}
 median_reporting <- linelist %>%
   mutate (
     lag_report = dt_report - dt_onset,
     lag_exposures = dt_end_exp - dt_start_exp,
-    lag_diagnosis = dt_diag - dt_onset ) %>%
+    lag_diagnosis = dt_diag - dt_onset,
+    week_report = week(dt_report)) %>%
   filter(
     !is.na(lag_report),
     !is.na(lag_exposures),
     !is.na(lag_diagnosis)) %>%
-  reframe(
-    id = id,
+  group_by(week_report) %>%
+  summarise(
+    week_report,
     lag_report = lag_report,
     lag_exposures = lag_exposures,
     lag_diagnosis = lag_diagnosis,
@@ -306,6 +323,8 @@ median_reporting
 
 nrow(median_reporting) / nrow(linelist) # 135 out of 162. 82% of the original data set
 
+# median lag across time
+ggplot(median_reporting, aes(x=week_report, y=median_report)) + geom_line() + geom_point()
 
 ggplot(median_reporting) +
   geom_histogram(
@@ -313,13 +332,30 @@ ggplot(median_reporting) +
     binwidth = 2, fill = "skyblue", color = "white", alpha = 0.8 ) + theme_minimal() +
   geom_histogram(
     aes(x=lag_diagnosis),
-    binwidth = 2, fill = "lightgreen", color = "white", alpha = 0.3 ) + theme_minimal()
+    binwidth = 2, fill = "lightgreen", color = "white", alpha = 0.3 ) + theme_minimal() +
+  geom_histogram(
+    aes(x=lag_exposures),
+    binwidth = 2, fill = "yellow", color = "white", alpha = 0.5 ) + theme_minimal()
 ```
 
 b)  Analyse your new variable as a function of time. What does the trend tell you about the institution's ability to 'learn' and mobilize resources over time?
 
 ```{r}
+# pivots
+lag_by_week_long <- median_reporting %>% 
+  pivot_longer(
+    cols = starts_with("median"),
+    names_to = "lag_type",
+    values_to = "median_lag" )
+lag_by_week_long
 
+ggplot(lag_by_week_long, 
+       aes(x = week_report, 
+           y = median_lag, 
+           color = lag_type,
+           group = lag_type) ) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2)
 ```
 
 c)  In MERS outbreaks in the Middle East, men were infected much more often. In this South Korean outbreak, is there a gender imbalance? What could this imply about the gender demographics of caregiving in Korean hospitals?
@@ -425,7 +461,7 @@ superspreaders_deep
 
 ## Attempting to graph a transmission chain
 
-```{r}
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 install.packages("pacman")
 library(pacman)
 
