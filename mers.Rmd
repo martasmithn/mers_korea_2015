@@ -1,6 +1,7 @@
 ---
-title: "MERS Korea 2015 - Marta Smith"
+title: "MERS-CoV Korea 2015 - Marta Smith"
 output:
+  pdf_document: default
   html_document: default
 date: "2025-12-01"
 editor_options:
@@ -9,7 +10,7 @@ editor_options:
 
 # Introduction
 
-In this R Markdown, I analyze the `mers_korea_2015` dataset from the "outbreaks" R package and answer questions about the MERS-CoV outbreak that happened in South Korea in 2015. Source: <https://github.com/luisfmontemayor/learn-compbio/tree/main>
+In this R Markdown, I analyze the `mers_korea_2015` dataset from the "outbreaks" R package and answer questions about the MERS-CoV outbreak in South Korea in 2015. Source: <https://github.com/luisfmontemayor/learn-compbio/tree/main>
 
 ```{r setup, include=FALSE}
 # Loading the necessary packages
@@ -44,6 +45,7 @@ knitr::opts_chunk$set(
 ## Loading and inspecting the data
 
 ```{r}
+# loading the data
 data("mers_korea_2015")
 ```
 
@@ -220,11 +222,9 @@ age_histogram
 
 2.  Based on first impressions, does age seem to be a determinant of mortality in this outbreak? How might the social status of the elderly in South Korea contribute to exposure risks (e.g., care homes, hospital frequency)?
 
-In South Korea, the elderly population is comprised of individuals aged 65 and over ([https://en.wikipedia.org/wiki/Aging_of_South_Korea](https://en.wikipedia.org/wiki/Aging_of_South_Korea#){.uri}).
+In South Korea, the elderly population is comprised of individuals aged 65 and older ([https://en.wikipedia.org/wiki/Aging_of_South_Korea](https://en.wikipedia.org/wiki/Aging_of_South_Korea#){.uri}). In this dataset, 49 of the cases are ages 65 and older (30% of the dataset).
 
-The deceased group represents 11.7% of the dataset, and age seems to be a determinant of mortality in the 2015 MERS outbreak in South Korea.
-
-The average age of the Dead group is 68 years old, 14.4 years higher than the Alive group (53.6). Also, the standard deviation for the Dead group is 56% lower in the Dead group with respect to the Alive group (8.9 vs 15.8). This shows that the data points in the Dead group are closer to the mean.
+Age seemed to be a determinant of mortality during the MERS-CoV outbreak in South Korea. The deceased group represents 11.7% of the dataset. The average age of the Dead group is 68 years old, 14.4 years higher than the Alive group (53.6). Also, the standard deviation for the Dead group is 56% lower in the Dead group with respect to the Alive group (8.9 vs 15.8). This shows that the data points in the Dead group are closer to the mean.
 
 Analyzing the types of exposures in this outbreak, 47% of all infections came from Hospital Room visits (27%) and Emergency Rooms (20%). "The index case was a returning traveler from the Middle East. The infection had spread within the hospital, and subsequently to other hospitals because of patient movement, resulting in nosocomial transmission at 16 clinics and hospitals." (Source: <https://pmc.ncbi.nlm.nih.gov/articles/PMC5840604/>).
 
@@ -276,14 +276,15 @@ ggplot(hospital_dist, aes(x = fct_infreq(loc_hosp), y = count, fill=exposure)) +
 
 3.  Name two social factors or behaviours you would expect from the sampled demographic that would increase the likelihood of exposure to MERS-CoV (particularly for the elderly population). An example could be "hospital hopping" where patients visit multiple hospitals to see different medical professionals.
 
-The main hospitals where MERS spread were Samsung Medical Center (52.5%) and Pyeongtaek St. Mary’s Hospital (PTSM) (22.8%). These two hospitals accounted for 74% of all infections.
+The main hospitals where MERS-CoV spread were Samsung Medical Center (52.5%) and Pyeongtaek St. Mary’s Hospital (PTSM) (22.8%). These two hospitals accounted for 74% of all infections. In the case of the elderly population (49 cases), 20 of them were infected at Samsung Medical Center.
 
-Hospital Room visits where family members and HCW could come and go could increase the likelihood of exposure to MERS-CoV. Another behavior that could increase the likelihood of becoming exposed would be to go to the emergency room for another medical condition/emergency.
+Hospital Room visits where family members and HCW could come and go could increase the likelihood of exposure to MERS-CoV. Another behavior that could increase the likelihood of becoming exposed would be to go to the emergency room for another medical condition.
 
 ```{r}
 # understanding the elderly population's behavior
 elderly <- linelist %>%
   filter(age >= 65)
+nrow(elderly)
 
 hospital_elderly <- elderly %>%
   group_by(loc_hosp) %>%
@@ -309,57 +310,46 @@ elderly_dist <- ggplot(elderly) +
     linetype = "dashed",
     linewidth = 1 ) +
   theme_minimal()
-
-# distribution across hospitals
-ggplot(linelist) + 
-  geom_bar(
-    aes(x = fct_infreq(loc_hosp) ),
-    fill = "#0072B2" ) +
-  labs(
-    title = "Frequency count",
-    x = "Local hospital",
-    y = "Frequency"
-  ) +
-  theme_minimal() + 
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # changing the text's angle
+elderly_dist
 
 # distribution across hospitals (elderly)
 ggplot(elderly) + 
   geom_bar(
     aes(x = fct_infreq(loc_hosp) ),
-    fill = "#0072B2" ) +
+    fill = "lightblue" ) +
   labs(
     title = "Frequency count of elderly",
     x = "Local hospital",
-    y = "Frequency"
+    y = ""
   ) +
   theme_minimal() + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) # changing the text's angle
 ```
 
-d\. Synthesize your statistical finding with your identified social factors and behaviours to explain how **social status and norms** acted as an **amplifier** of the biological risk posed by age. Maybe it's a good time to look into Korean culture too!
+4.  Synthesize your statistical finding with your identified social factors and behaviours to explain how **social status and norms** acted as an **amplifier** of the biological risk posed by age. Maybe it's a good time to look into Korean culture too!
 
-```{r results='hide'}
+```{r}
 
 ```
 
-e\. Repeat task (d) but with the following points: saturated emergency rooms and family caregiving, common in Korea, where there is a cultural expectation for family members (usually younger women or older teens) to stay in the patient's room providing simple emotional and practical support.
+5.  Repeat task (d) but with the following points: saturated emergency rooms and family caregiving, common in Korea, where there is a cultural expectation for family members (usually younger women or older teens) to stay in the patient's room providing simple emotional and practical support.
 
-```{r results='hide'}
+```{r}
 exposures <- contacts %>%
   group_by(exposure) %>%
   summarise (
     count = n(),
     percentage = count / nrow(linelist) * 100) %>%
   arrange(desc(count))
-exposures
+head(exposures)
 
 exposure_types <- ggplot(contacts) + 
   geom_bar(aes(x = fct_infreq(exposure)), fill="lightgreen") +
   labs(
     x="Exposure Type",
     y="Cases" ) + 
-  theme_minimal()
+  theme_minimal() + theme(axis.text.x = element_text(angle = 30, hjust = 1))
+exposure_types
 ```
 
 ## **2. Institutional Analysis**
@@ -372,58 +362,75 @@ The median reporting between the date of onset and the date of reporting is 5 da
 median_reporting <- linelist %>%
   mutate (
     lag_report = dt_report - dt_onset,
-    lag_exposures = dt_end_exp - dt_start_exp,
-    lag_diagnosis = dt_diag - dt_onset,
-    week_report = week(dt_report)) %>%
+    lag_max = dt_report - dt_start_exp, # max delay
+    lag_min = dt_report - dt_end_exp, # min delay
+    lag_exp_to_onset = lag_max - lag_report, # days between exposure and reporting
+    week = week(dt_report)) %>%
   filter(
     !is.na(lag_report),
-    !is.na(lag_exposures),
-    !is.na(lag_diagnosis)) %>%
-  group_by(week_report) %>%
-  reframe(
-    week_report,
-    lag_report = lag_report,
-    lag_exposures = lag_exposures,
-    lag_diagnosis = lag_diagnosis,
+    !is.na(lag_max),
+    !is.na(lag_min),
+    !is.na(lag_exp_to_onset)) %>%
+  group_by(week) %>%
+  summarise(
+    median_max = median(lag_max, na.rm = TRUE),
+    median_min = median(lag_min, na.rm = TRUE),
     median_report = median(lag_report, na.rm = TRUE),
-    median_exposures = median(lag_exposures, na.rm = TRUE),
-    median_diagonsis = median(lag_diagnosis, na.rm = TRUE),
-    .groups = 'drop'
-  )
+    median_exposures = median(lag_max, na.rm = TRUE),
+    .groups = 'drop')
 head(median_reporting)
 ```
 
 2.  Analyse your new variable as a function of time. What does the trend tell you about the institution's ability to 'learn' and mobilize resources over time?
 
+In week 22, the median reporting lag between the onset of symptoms and the report was the highest recorded (8 days). After week 22, the Korea CDC learned and the cases reported in weeks 23 and 24 decreased their lags to 5 and 4 days respectively.
+
 ```{r}
+# median lag across time
+ggplot(median_reporting, aes(x=week, y=median_report)) + 
+  geom_line() + geom_point() + theme_minimal() +
+  labs(x="Week number", y="Days between onset and report")
+
 # analyzing different lags
 lag_by_week_long <- median_reporting %>% 
   pivot_longer(
     cols = starts_with("median"),
     names_to = "lag_type",
-    values_to = "median_lag" )
-
-# median lag across time
-ggplot(median_reporting, aes(x=week_report, y=median_report)) + 
-  geom_line() + geom_point() + theme_minimal() +
-  labs(x="Week number", y="Days between onset and report")
+    values_to = "values" )
 
 ggplot(lag_by_week_long, 
-       aes(x = week_report, 
-           y = median_lag, 
+       aes(x = week, 
+           y = values, 
            color = lag_type,
            group = lag_type) ) +
   geom_line(linewidth = 1) +
-  geom_point(size = 2) + theme_minimal()
+  geom_point(size = 2) + 
+  labs(x="Week", y="Median Reporting Lag", color="Type of Lag")+ theme_minimal()
 ```
 
-3.  In MERS outbreaks in the Middle East, men were infected much more often. In this South Korean outbreak, is there a gender imbalance? What could this imply about the gender demographics of caregiving in Korean hospitals?
+3.  In MERS-CoV outbreaks in the Middle East, men were infected much more often. In this South Korean outbreak, is there a gender imbalance? What could this imply about the gender demographics of caregiving in Korean hospitals?
+
+In this outbreak, men were infected 1.5 times higher than women.
 
 ```{r}
+# looking up the gender distribution
+gender_stats <- linelist %>%
+  filter(
+    place_infect != "Middle East"
+  ) %>%
+  group_by(place_infect, sex, outcome) %>%
+  summarise(
+    count = n(),
+    percentage = count / nrow(linelist) * 100,
+    median_age = median(age, na.rm = TRUE))
+gender_stats
 
+ggplot(gender_stats, aes(x= fct_infreq(sex), y=count, fill=outcome)) +
+  geom_bar(stat="identity", position="dodge") + theme_minimal() +
+  labs(x="Sex", y="", fill="Outcome")
 ```
 
-*Bonus* - investigate why there were more male than female cases in the middle east spread of MERS. Why would this not apply in Korea?
+*Bonus* - investigate why there were more male than female cases in the middle east spread of MERS-CoV. Why would this not apply in Korea?
 
 ## **3. The Super-Spreader**
 
@@ -509,50 +516,21 @@ superspreaders_deep
 
 # Appendix
 
-## Attempting to graph a transmission chain
+## Infection Network
 
-```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
-install.packages("pacman")
-library(pacman)
-
-pacman::p_load( # source: https://www.epirhandbook.com/en/new_pages/contact_tracing.html
-  igraph,
-  visNetwork,
-  dplyr
+```{r fig.width=15, fig.height=10, out.width='100%'}
+library(igraph)
+links <- data.frame(
+  source= contacts$from,
+  target = contacts$to
+)
+network <- graph_from_data_frame(
+  d=links,
+  directed=F
 )
 
-edges_df <- contacts %>%
-  # Filter out rows where the contact is unknown (NA) if necessary
-  filter(!is.na(from), !is.na(to)) %>%
-  # Select and rename columns for igraph/visNetwork standard: from/to
-  select(
-    from = from, 
-    to = to
-  ) %>%
-  # Remove duplicate edges, if any (e.g., if multiple contacts recorded between the same pair)
-  distinct()
-
-
-# Make sure 'from' and 'to' in edges_df are characters to match 'id' in nodes_df
-edges_df <- edges_df %>% 
-  mutate(
-    from = as.character(from),
-    to = as.character(to))
-
-nodes_df <- nodes_df %>%
-  mutate(
-    id = as.character(id))
-
-
-# Create the interactive visualization
-visNetwork(nodes_df, edges_df, main = "MERS-CoV Korea 2015 Transmission Chain") %>%
-  # Set up the visualization appearance
-  visNetwork(nodes_df, edges_df, main = "MERS-CoV Korea 2015 Transmission Chain") %>%
-  # visIgraphLayout(layout = "nicely") %>% # <--- ¡COMENTA ESTA LÍNEA!
-  visNodes(shape = "dot", size = 15) %>%
-  visEdges(arrows = 'to', color = 'grey') %>% # 'arrows = to' shows direction of transmission
-  visOptions(highlightNearest = TRUE,   # Add interaction options (allows dragging, zooming)
-             nodesIdSelection = TRUE,
-             selectedBy = "outcome") %>%
-  visLegend(main = "Outcome", position = "right")  # Add legend for outcome colors
+plot(network,
+     vertex.size = 10,
+     vertex.label.cex = 0.5,
+     vertex.color="lightblue")
 ```
