@@ -1,7 +1,6 @@
 ---
 title: "MERS-CoV Korea 2015 - Marta Smith"
 output:
-  pdf_document: default
   html_document: default
 date: "2025-12-01"
 editor_options:
@@ -59,12 +58,14 @@ data("mers_korea_2015")
 
 It contains 2 sub-items that are dataframes: `linelist` and `contacts`. `linelist`: A dataframe of MERS-CoV cases and their attributes ([source](https://www.rdocumentation.org/packages/outbreaks/versions/1.1.0/topics/mers.korea.2015)). `contacts`: A dataframe describing the relationship between MERS Co-V cases ([source](https://www.rdocumentation.org/packages/outbreaks/versions/1.1.0/topics/mers.korea.2015)).
 
-```{r}
+```{r results='hold'}
 # inspecting the raw data
 class(mers_korea_2015)
 class(mers_korea_2015$linelist)
 class(mers_korea_2015$contacts)
+```
 
+```{r}
 length(mers_korea_2015) # number of elements the list contains
 names(mers_korea_2015) # names of the elements of the list
 str(mers_korea_2015) # structure function
@@ -97,7 +98,6 @@ linelist <- linelist %>%
   mutate(
     loc_hosp = str_trim(loc_hosp)
   )
-unique(linelist$loc_hosp)
 ```
 
 # Analyses
@@ -194,7 +194,7 @@ outcome_stats
 
 # ggplot for the average age of the two populations
 age_by_outcome <- ggplot(linelist) + 
-  geom_violin(aes(x=outcome, y=age, fill=outcome)) + 
+  geom_boxplot(aes(x=outcome, y=age, fill=outcome)) + 
   theme_minimal() +
   labs(title="",
        x="Outcome", y="Age",fill="Outcome")
@@ -250,10 +250,10 @@ exposure_count <- contacts %>%
   arrange(desc(count))
 head(exposure_count)
   
-hospital_dist <- contacts %>%
-  rename(id = from) %>%
-  select(id, exposure) %>%
-  left_join(linelist, by="id") %>%
+hospital_dist <- linelist %>%
+  rename(to = id) %>%
+  left_join(contacts, by="to") %>%
+  rename(id = to) %>%
   group_by(loc_hosp, exposure) %>%
   summarise(
     count = n(),
@@ -262,7 +262,7 @@ hospital_dist <- contacts %>%
     .groups = 'drop'
   ) %>%
   arrange(desc(count))
-(hospital_dist)
+head(hospital_dist)
 
 ggplot(hospital_dist, aes(x = fct_infreq(loc_hosp), y = count, fill=exposure)) +
   geom_bar(stat="identity", position="dodge") +
@@ -356,38 +356,94 @@ exposure_types
 
 1.  Calculate the median reporting lag from the original variables provided. On average, how many days were people sick and potentially interacting with their social networks before the institution 'captured' them?
 
-The median reporting between the date of onset and the date of reporting is 5 days. For 5 days, cases were interacting with other people, potentially transmitting MERS-CoV. SK_1, one of the super-spreaders and responsible for 26 infections, had a lag of 16 days between the onset of symptoms and their report.
+On a first approach, the median reporting lag in the `linelist` dataset is 5 days while the median lag in the `contacts` dataset is 14 days. Digging deeper into the data, the primary cases of the `contacts` dataset represent 6.7% of the `linelist`, while the secondary cases represent 58%. Also, 16% of the cases from the `linelist` do not have an onset date.
+
+For 5 days, cases were interacting with other people, potentially transmitting MERS-CoV. SK_1, one of the super-spreaders and responsible for 26 infections, had a lag of 16 days between the onset of symptoms and their report.
+
+The reporting lag of the `contacts` dataset is nearly 3 times higher than the `linelist`. This suggests that the secondary cases took longer to trace and report.
 
 ```{r}
-median_reporting <- linelist %>%
-  mutate (
-    lag_report = dt_report - dt_onset,
-    lag_max = dt_report - dt_start_exp, # max delay
-    lag_min = dt_report - dt_end_exp, # min delay
-    lag_exp_to_onset = lag_max - lag_report, # days between exposure and reporting
-    week = week(dt_report)) %>%
-  filter(
-    !is.na(lag_report),
-    !is.na(lag_max),
-    !is.na(lag_min),
-    !is.na(lag_exp_to_onset)) %>%
-  group_by(week) %>%
+# to see the number of onset dates that are missing
+no_onset_date <- linelist %>%
   summarise(
-    median_max = median(lag_max, na.rm = TRUE),
-    median_min = median(lag_min, na.rm = TRUE),
-    median_report = median(lag_report, na.rm = TRUE),
-    median_exposures = median(lag_max, na.rm = TRUE),
-    .groups = 'drop')
-head(median_reporting)
+    count = n(),
+    yes_dt_onset = sum(!is.na(dt_onset)),
+    no_dt_onset = sum(is.na(dt_onset)),
+    percentage = (no_dt_onset / count) * 100
+  )
+no_onset_date
+
+median_contacts <- median(contacts$diff_dt_onset)
+median_linelist <- median(as.numeric(linelist$dt_report - linelist$dt_onset), na.rm=TRUE)
+```
+
+```{r results='hold'}
+median_contacts
+median_linelist
+
+# difference between both datasets
+median_contacts - median_linelist
+```
+
+```{r results='hold'}
+# what is the proportion of the contacts dataset
+n_distinct(contacts$from) / nrow(linelist) * 100 # primary cases
+n_distinct(contacts$to) / nrow(linelist) * 100 # secondary cases
+```
+
+```{r}
+# all lag observations across linelist and contacts
+lag_comparison <- data.frame(
+  delay = c(as.numeric(linelist$dt_report - linelist$dt_onset), 
+            as.numeric(contacts$diff_dt_onset)),
+  dataset = c(rep("Linelist", nrow(linelist)), 
+             rep("Contacts", nrow(contacts)))
+)
+
+# comparing the delay distributions across datasets
+ggplot(lag_comparison, aes(x = delay, fill = dataset)) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Lag Reporting Distribution",
+       x="Delay between onset and report",
+       y="Density",
+       fill="Dataset")
+
+# comparing the median reporting lags across datasets
+ggplot(lag_comparison, aes(x = dataset, y = delay, fill = dataset)) +
+  geom_boxplot(alpha = 0.7) +
+  stat_summary(fun = median, geom = "label", aes(label = after_stat(y)), vjust = 0.5) +
+  theme_minimal() +
+  labs(title = "Median Reporting Lag: Linelist vs Contact Chain",
+       y = "Days between onset and report",
+       x = "") +
+  guides(fill = "none")
 ```
 
 2.  Analyse your new variable as a function of time. What does the trend tell you about the institution's ability to 'learn' and mobilize resources over time?
 
 In week 22, the median reporting lag between the onset of symptoms and the report was the highest recorded (8 days). After week 22, the Korea CDC learned and the cases reported in weeks 23 and 24 decreased their lags to 5 and 4 days respectively.
 
-```{r}
+```{r results='hold'}
+# median reporting lag as a time variable
+median_reporting <- linelist %>%
+  rename(to = id) %>%
+  left_join(contacts, by="to") %>%
+  rename(id = to) %>%
+  mutate (
+    lag_linelist = as.numeric(dt_report - dt_onset),
+    lag_contacts = diff_dt_onset,
+    week = week(dt_report)) %>%
+  filter(
+    !is.na(lag_linelist)) %>%
+  group_by(week) %>%
+  summarise(
+    median_lag_linelist = median(lag_linelist, na.rm = TRUE),
+    median_lag_contacts = median(lag_contacts, na.rm = TRUE),
+    .groups = 'drop')
+
 # median lag across time
-ggplot(median_reporting, aes(x=week, y=median_report)) + 
+ggplot(median_reporting, aes(x=week, y=median_lag_linelist)) + 
   geom_line() + geom_point() + theme_minimal() +
   labs(x="Week number", y="Days between onset and report")
 
@@ -408,9 +464,13 @@ ggplot(lag_by_week_long,
   labs(x="Week", y="Median Reporting Lag", color="Type of Lag")+ theme_minimal()
 ```
 
+```{r}
+
+```
+
 3.  In MERS-CoV outbreaks in the Middle East, men were infected much more often. In this South Korean outbreak, is there a gender imbalance? What could this imply about the gender demographics of caregiving in Korean hospitals?
 
-In this outbreak, men were infected 1.5 times higher than women.
+In South Korea, men were infected 1.5 times higher than women.
 
 ```{r}
 # looking up the gender distribution
@@ -418,16 +478,24 @@ gender_stats <- linelist %>%
   filter(
     place_infect != "Middle East"
   ) %>%
-  group_by(place_infect, sex, outcome) %>%
+  group_by(place_infect, sex) %>%
   summarise(
     count = n(),
     percentage = count / nrow(linelist) * 100,
     median_age = median(age, na.rm = TRUE))
 gender_stats
 
-ggplot(gender_stats, aes(x= fct_infreq(sex), y=count, fill=outcome)) +
-  geom_bar(stat="identity", position="dodge") + theme_minimal() +
-  labs(x="Sex", y="", fill="Outcome")
+gender_ratio <- nrow(subset(linelist, sex =="M")) / nrow(subset(linelist, sex =="F"))
+gender_ratio
+
+# distribution by age and sex
+ggplot(linelist, aes(x = age, fill = sex)) +
+  geom_histogram(data = subset(linelist, sex == "F"), aes(y = ..count.. * -1)) +
+  geom_histogram(data = subset(linelist, sex == "M"), aes(y = ..count..)) +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Distribution by Age and Gender", y = "Cases", x="Age") +
+  scale_y_continuous(labels = abs)
 ```
 
 *Bonus* - investigate why there were more male than female cases in the middle east spread of MERS-CoV. Why would this not apply in Korea?
@@ -441,6 +509,20 @@ For this analysis, I will categorize the super-spreader as those ids that infect
 Based on the Contacts data set and the previous assumption, we can identify 10 spreaders in this outbreak, and 3 super-spreaders: SK_14, SK_1, and SK_16. These 3 super-spreaders are males with an average age of 35 years old and located in the Pyeongtaek St. Mary Hospital (PTSM).
 
 The 3 super-spreaders were responsible for 85 infections (52%). The super-spreader infected 4 times more than the average spreaders.
+
+```{r eval=FALSE, include=FALSE}
+# to review!!
+super_spreaders <- grouped_data %>%
+  group_by(id) %>%
+  summarise(
+    n_contactos = n(),
+    delay = first(diff_onset_report)
+  ) %>%
+  arrange(desc(n_contactos))
+
+# ¿Hay correlación entre n_contactos y delay?
+plot(super_spreaders$n_contactos, super_spreaders$delay)
+```
 
 ```{r}
 # count of infections caused by each spreader
