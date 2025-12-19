@@ -1,8 +1,10 @@
 ---
 title: "MERS-CoV Korea 2015 - Marta Smith"
 output:
+  pdf_document: default
   html_document: default
 date: "2025-12-01"
+geometry: margin=2cm
 editor_options:
   chunk_output_type: inline
 ---
@@ -22,22 +24,24 @@ library(forcats) # to use fct_infreq
 library(lubridate) # to extract weeks from dates
 library(tinytex)
 library(knitr) 
+library(psych)
+library(naniar)
 
-# Establece opciones para todos los chunks:
+# Chunk setting:
 knitr::opts_chunk$set(
-  # 1. TAMAÑO DE LA FIGURA (para reducir el espacio)
-  fig.width = 5,          # Ancho de la figura en pulgadas
-  fig.height = 3.5,       # Alto de la figura en pulgadas
-  out.width = '70%',      # Escala la imagen generada al 70% del ancho del texto
+  # Fig size
+  fig.width = 5,          
+  fig.height = 3.5,
+  out.width = '70%',
   
-  # 2. COLOCACIÓN DE LA FIGURA (para evitar saltos de página)
-  fig.pos = 'h',          # Sugiere a LaTeX colocar la figura 'here' (aquí)
-  out.extra = '',         # Evita el entorno flotante de LaTeX para mejor colocación
+  # Fig output
+  fig.pos = 'h',          # 'here'
+  out.extra = '',
   
-  # Opcional: Mostrar el código por defecto, ocultar advertencias
-  echo = TRUE,            # Muestra el código en el documento final (predeterminado)
-  warning = FALSE,        # Oculta mensajes de advertencia de R (útil)
-  message = FALSE         # Oculta mensajes de consola de R (útil)
+  # Optional settings
+  echo = TRUE,            
+  warning = FALSE, 
+  message = FALSE 
 )
 ```
 
@@ -50,13 +54,13 @@ data("mers_korea_2015")
 
 ### Quick questions
 
-1.  What object class is `mers_korea_2015` in R? Describe what this class is like, and how is it different from a simple atomic type in R (like a `string` like "hello world!" or a `logical` value like `true`) or a vector type defined with `c()`
+1.  What object class is `mers_korea_2015` in R?
 
-`mers_korea_2015` is a list. A list is a collection of data which is ordered and changeable ([source](https://www.w3schools.com/r/r_lists.asp)).
+`mers_korea_2015` is a list. A list is a collection of data which is ordered and changeable (source: <https://www.w3schools.com/r/r_lists.asp>).
 
 2.  What sub-items exist within this item?
 
-It contains 2 sub-items that are dataframes: `linelist` and `contacts`. `linelist`: A dataframe of MERS-CoV cases and their attributes ([source](https://www.rdocumentation.org/packages/outbreaks/versions/1.1.0/topics/mers.korea.2015)). `contacts`: A dataframe describing the relationship between MERS Co-V cases ([source](https://www.rdocumentation.org/packages/outbreaks/versions/1.1.0/topics/mers.korea.2015)).
+It contains 2 sub-items that are dataframes: `linelist` and `contacts`. `linelist`: A dataframe of MERS-CoV cases and their attributes. `contacts`: A dataframe describing the relationship between MERS Co-V cases (source: <https://www.rdocumentation.org/packages/outbreaks/versions/1.1.0/topics/mers.korea.2015>).
 
 ```{r results='hold'}
 # inspecting the raw data
@@ -73,21 +77,25 @@ str(mers_korea_2015) # structure function
 
 3.  How can one access the sub-items within the `mers_korea_2015`?
 
-```{r results='hide'}
+```{r results='hide', include=FALSE}
 # separating the data sets
 # different ways of accessing the sub-items: either with a $ or [1]
 mers_korea_2015$linelist
 mers_korea_2015[1]
 
-# creating new variables for each sub-item
-linelist <- mers_korea_2015$linelist
-contacts <-mers_korea_2015$contacts
+
+# cleaning the contacts
+contacts <-mers_korea_2015$contacts %>%
+  mutate(
+    lag_contacts = as.numeric(diff_dt_onset) )
 ```
 
 4.  The "sub-items" within `mers_korea_2015` are different data sets within our project. Play with them! Open them, plot graphs, get your hands dirty. The questions won't always tell you what data set to use! So know what you're starting with, to make sure that you can
 
 ```{r}
-# cleaning the data
+# exploring the linelist
+linelist <- mers_korea_2015$linelist
+
 linelist <- linelist %>%
   mutate(
     loc_hosp = str_replace(
@@ -96,8 +104,33 @@ linelist <- linelist %>%
       replacement = ""
     ) ) %>%
   mutate(
-    loc_hosp = str_trim(loc_hosp)
+    loc_hosp = str_trim(loc_hosp),
+    week = week(dt_report),
+    lag_linelist = as.numeric(dt_report - dt_onset)
   )
+
+# library(naniar) to check the missing values in the dataset
+n_miss(linelist)
+pct_miss(linelist)
+
+linelist %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), 
+               names_to = "variable", 
+               values_to = "NA_count")
+
+# NA distribution and percentage
+linelist %>%
+  vis_miss() +
+  theme(axis.text.x = element_text(vjust = 0) )
+```
+
+```{r}
+describe(linelist)
+describe(contacts)
+
+quantile(linelist$lag_linelist, na.rm=TRUE)
+quantile(contacts$lag_contacts, na.rm=TRUE)
 ```
 
 # Analyses
@@ -105,33 +138,16 @@ linelist <- linelist %>%
 ## Getting my hands dirty with the data
 
 ```{r results='hide'}
-# admissions grouped by sex and date of report
-admissions_summary <- linelist %>%
-  group_by(dt_report, sex) %>%
-  summarise(
-    count = n(),
-    mean_age = mean(age, na.rm= TRUE),
-    .groups = 'drop'
-  )
-
-# Pivot table by ages per date of report
-pivot_age <- admissions_summary %>%
-  pivot_wider(
-    id_cols = dt_report, # columns
-    names_from = sex, # names of the column
-    values_from = mean_age, # values
-    names_prefix = "mean_age_" # optional
-  )
-
-# count of admissions by the number of week
+# admissions by the week number
 admissions_by_week <- ggplot(linelist) + 
-  geom_bar(aes(x=week_report), fill="gray", color="black") + # color is used for the outline
+  geom_bar(aes(x=week), fill="gray", color="black") +
   theme_minimal() +
   labs(
     title="MERS admissions by week",
     x="Week",
     y="Admissions"
   )
+admissions_by_week
 
 # admissions by date of report
 admissions_by_dt_report <- ggplot(linelist) + 
@@ -142,10 +158,29 @@ admissions_by_dt_report <- ggplot(linelist) +
     x="Date of Report",
     y="Admissions"
   )
+admissions_by_dt_report
 
-# admissions by sex
-admissions_by_sex <- ggplot(admissions_summary, aes(x=dt_report, y=count, color=sex)) + 
-  geom_line(linewidth =0.7, alpha=0.7) + geom_point(size=2, alpha=0.7)
+# admissions grouped by sex and date of report
+admissions_summary <- linelist %>%
+  group_by(week, sex) %>%
+  summarise(
+    count = n(),
+    mean_age = mean(age, na.rm= TRUE),
+    .groups = 'drop'
+  )
+admissions_summary
+
+admissions_by_sex <- ggplot(admissions_summary, aes(x=week, y=count, color=sex)) +
+  geom_line(linewidth=1) + geom_point(size=2) + theme_minimal() +
+  labs(x="Week", y="Cases")
+admissions_by_sex
+
+# Mean Age of infected per week and sex
+ggplot(admissions_summary, aes(x=week, y=mean_age, color=sex)) +
+  geom_line(linewidth=1) + geom_point(size=2) + theme_minimal() +
+  labs(x="Week", y="Mean Age of Infected")
+
+
 
 # first approach to understand the average age of the two populations
 age_by_outcome <- ggplot(linelist) + 
@@ -153,12 +188,6 @@ age_by_outcome <- ggplot(linelist) +
   theme_minimal() +
   labs(title="",
        x="Outcome", y="Age",fill="Outcome")
-```
-
-```{r}
-admissions_by_week
-admissions_by_dt_report
-admissions_by_sex
 age_by_outcome
 ```
 
@@ -394,8 +423,8 @@ n_distinct(contacts$to) / nrow(linelist) * 100 # secondary cases
 ```{r}
 # all lag observations across linelist and contacts
 lag_comparison <- data.frame(
-  delay = c(as.numeric(linelist$dt_report - linelist$dt_onset), 
-            as.numeric(contacts$diff_dt_onset)),
+  delay = c(linelist$lag_linelist, 
+            contacts$lag_contacts),
   dataset = c(rep("Linelist", nrow(linelist)), 
              rep("Contacts", nrow(contacts)))
 )
@@ -424,15 +453,13 @@ ggplot(lag_comparison, aes(x = dataset, y = delay, fill = dataset)) +
 
 In week 22, the median reporting lag between the onset of symptoms and the report was the highest recorded (8 days). After week 22, the Korea CDC learned and the cases reported in weeks 23 and 24 decreased their lags to 5 and 4 days respectively.
 
-```{r results='hold'}
+```{r include=FALSE}
 # median reporting lag as a time variable
 median_reporting <- linelist %>%
   rename(to = id) %>%
   left_join(contacts, by="to") %>%
   rename(id = to) %>%
   mutate (
-    lag_linelist = as.numeric(dt_report - dt_onset),
-    lag_contacts = diff_dt_onset,
     week = week(dt_report)) %>%
   filter(
     !is.na(lag_linelist)) %>%
@@ -462,10 +489,6 @@ ggplot(lag_by_week_long,
   geom_line(linewidth = 1) +
   geom_point(size = 2) + 
   labs(x="Week", y="Median Reporting Lag", color="Type of Lag")+ theme_minimal()
-```
-
-```{r}
-
 ```
 
 3.  In MERS-CoV outbreaks in the Middle East, men were infected much more often. In this South Korean outbreak, is there a gender imbalance? What could this imply about the gender demographics of caregiving in Korean hospitals?
