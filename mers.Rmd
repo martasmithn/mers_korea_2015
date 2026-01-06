@@ -1,7 +1,6 @@
 ---
 title: "MERS-CoV Korea 2015 - Marta Smith"
 output:
-  pdf_document: default
   html_document: default
 date: "2025-12-01"
 geometry: margin=2cm
@@ -18,7 +17,7 @@ In this R Markdown, I analyze the `mers_korea_2015` dataset from the "outbreaks"
 library(dplyr)
 library(tidyr)
 library(stringr)
-library(ggplot2) # ggplot()
+library(ggplot2)
 library(outbreaks) # data(mers_korea_2015)
 library(forcats) # to use fct_infreq
 library(lubridate) # to extract weeks from dates
@@ -35,12 +34,12 @@ knitr::opts_chunk$set(
   out.width = '70%',
   
   # Fig output
-  fig.pos = 'h',          # 'here'
+  fig.pos = 'h', # this means 'here'
   out.extra = '',
   
   # Optional settings
-  echo = TRUE,            
-  warning = FALSE, 
+  echo = TRUE,
+  warning = FALSE,
   message = FALSE 
 )
 ```
@@ -69,33 +68,39 @@ class(mers_korea_2015$linelist)
 class(mers_korea_2015$contacts)
 ```
 
-```{r}
+```{r results='hold'}
 length(mers_korea_2015) # number of elements the list contains
 names(mers_korea_2015) # names of the elements of the list
-str(mers_korea_2015) # structure function
+summary(mers_korea_2015)
+```
+
+```{r results='hide'}
+str(mers_korea_2015)
+describe(mers_korea_2015$linelist)
+describe(mers_korea_2015$contacts)
+```
+
+```{r results='hold'}
+summary(mers_korea_2015$linelist)
+summary(mers_korea_2015$contacts)
 ```
 
 3.  How can one access the sub-items within the `mers_korea_2015`?
 
-```{r results='hide', include=FALSE}
+```{r results='hide'}
 # separating the data sets
-# different ways of accessing the sub-items: either with a $ or [1]
+# different ways of accessing the sub-items
 mers_korea_2015$linelist
 mers_korea_2015[1]
-
-
-# cleaning the contacts
-contacts <-mers_korea_2015$contacts %>%
-  mutate(
-    lag_contacts = as.numeric(diff_dt_onset) )
 ```
 
 4.  The "sub-items" within `mers_korea_2015` are different data sets within our project. Play with them! Open them, plot graphs, get your hands dirty. The questions won't always tell you what data set to use! So know what you're starting with, to make sure that you can
 
 ```{r}
-# exploring the linelist
+# linelist
 linelist <- mers_korea_2015$linelist
 
+# cleaning the linelist
 linelist <- linelist %>%
   mutate(
     loc_hosp = str_replace(
@@ -105,90 +110,94 @@ linelist <- linelist %>%
     ) ) %>%
   mutate(
     loc_hosp = str_trim(loc_hosp),
-    week = week(dt_report),
+    week_report = week(dt_report),
+    week_onset = week(dt_onset),
     lag_linelist = as.numeric(dt_report - dt_onset)
   )
 
-# library(naniar) to check the missing values in the dataset
-n_miss(linelist)
-pct_miss(linelist)
-
+# missing values
 linelist %>%
   summarise(across(everything(), ~ sum(is.na(.)))) %>%
   pivot_longer(cols = everything(), 
                names_to = "variable", 
-               values_to = "NA_count")
+               values_to = "NA_count") %>%
+  mutate(percentage = round((NA_count / nrow(linelist)) * 100, 2)) %>%
+  filter(NA_count > 0)
 
-# NA distribution and percentage
+# library(naniar) to check the missing values in the dataset
 linelist %>%
   vis_miss() +
   theme(axis.text.x = element_text(vjust = 0) )
 ```
 
 ```{r}
-describe(linelist)
-describe(contacts)
+# contacts
+contacts <- mers_korea_2015$contacts
 
-quantile(linelist$lag_linelist, na.rm=TRUE)
-quantile(contacts$lag_contacts, na.rm=TRUE)
+# cleaning the contacts
+contacts <- mers_korea_2015$contacts %>%
+  rename (lag_contacts = diff_dt_onset ) %>%
+  mutate(
+    lag_contacts = as.numeric(lag_contacts) )
 ```
 
 # Analyses
 
 ## Getting my hands dirty with the data
 
-```{r results='hide'}
-# admissions by the week number
-admissions_by_week <- ggplot(linelist) + 
-  geom_bar(aes(x=week), fill="gray", color="black") +
-  theme_minimal() +
-  labs(
-    title="MERS admissions by week",
-    x="Week",
-    y="Admissions"
+```{r}
+# frequency tables
+report_frequency <- linelist %>%
+  group_by(dt_report) %>%
+  summarise(
+    count = n()
   )
-admissions_by_week
 
-# admissions by date of report
-admissions_by_dt_report <- ggplot(linelist) + 
-  geom_bar(aes(x=dt_report), fill="gray", color="black") + # color is used for the outline
-  theme_minimal() +
-  labs(
-    title="MERS admissions by date of report",
-    x="Date of Report",
-    y="Admissions"
-  )
-admissions_by_dt_report
+onset_frequency <- linelist %>%
+  group_by(dt_onset) %>%
+  summarise(
+    count = n() )
 
+# distribution of cases by onset and report dates
+ggplot(linelist) +
+  geom_histogram(aes(x=dt_onset, fill="Onset Date"), alpha = 0.7, color="black") +
+  geom_histogram(aes(x=dt_report, fill="Report Date"), alpha=0.6, color="black") +
+  scale_fill_manual(values = c("Onset Date" = "purple",
+                               "Report Date" = "yellow")) +
+  theme_minimal() + labs(x="", y="Frequency",
+                         title="Distribution of cases by Onset and Report Dates",
+                         fill="") +
+  theme(legend.position="top")
+```
+
+```{r results='hold'}
 # admissions grouped by sex and date of report
-admissions_summary <- linelist %>%
-  group_by(week, sex) %>%
+frequency_by_sex <- linelist %>%
+  group_by(week_report, sex) %>%
   summarise(
     count = n(),
     mean_age = mean(age, na.rm= TRUE),
     .groups = 'drop'
   )
-admissions_summary
 
-admissions_by_sex <- ggplot(admissions_summary, aes(x=week, y=count, color=sex)) +
+# understanding the cases by sex
+ggplot(frequency_by_sex, aes(x=week_report, y=count, color=sex)) +
   geom_line(linewidth=1) + geom_point(size=2) + theme_minimal() +
-  labs(x="Week", y="Cases")
-admissions_by_sex
+  labs(x="Week", y="Cases", color="Sex") 
 
-# Mean Age of infected per week and sex
-ggplot(admissions_summary, aes(x=week, y=mean_age, color=sex)) +
+# mean age of infected by sex
+ggplot(frequency_by_sex, aes(x=week_report, y=mean_age, color=sex)) +
   geom_line(linewidth=1) + geom_point(size=2) + theme_minimal() +
-  labs(x="Week", y="Mean Age of Infected")
+  labs(x="Week", y="Mean Age of Infected", color="Sex")
+```
 
-
-
-# first approach to understand the average age of the two populations
-age_by_outcome <- ggplot(linelist) + 
+```{r}
+# average age by outcome
+ggplot(linelist) + 
   geom_violin(aes(x=outcome, y=age, fill=outcome)) + 
   theme_minimal() +
   labs(title="",
        x="Outcome", y="Age",fill="Outcome")
-age_by_outcome
 ```
 
 ## 1. Demographics
@@ -251,11 +260,11 @@ age_histogram
 
 2.  Based on first impressions, does age seem to be a determinant of mortality in this outbreak? How might the social status of the elderly in South Korea contribute to exposure risks (e.g., care homes, hospital frequency)?
 
-In South Korea, the elderly population is comprised of individuals aged 65 and older ([https://en.wikipedia.org/wiki/Aging_of_South_Korea](https://en.wikipedia.org/wiki/Aging_of_South_Korea#){.uri}). In this dataset, 49 of the cases are ages 65 and older (30% of the dataset).
+In South Korea, the elderly population is comprised of individuals aged 65 and older ([https://en.wikipedia.org/wiki/Aging_of_South_Korea](https://en.wikipedia.org/wiki/Aging_of_South_Korea#){.uri}). In this dataset, 49 of the cases are ages 65 and older.
 
-Age seemed to be a determinant of mortality during the MERS-CoV outbreak in South Korea. The deceased group represents 11.7% of the dataset. The average age of the Dead group is 68 years old, 14.4 years higher than the Alive group (53.6). Also, the standard deviation for the Dead group is 56% lower in the Dead group with respect to the Alive group (8.9 vs 15.8). This shows that the data points in the Dead group are closer to the mean.
+Age seemed to be a determinant of mortality during the MERS-CoV outbreak in South Korea. The deceased group represents 11.7% of the dataset. The average age of the Dead group is 68 years old, 14.4 years higher than the Alive group (53.6). Also, the standard deviation for the Dead group is 56% lower with respect to the Alive group (8.9 vs 15.8). This shows that the data points in the Dead group are closer to the mean.
 
-Analyzing the types of exposures in this outbreak, 47% of all infections came from Hospital Room visits (27%) and Emergency Rooms (20%). "The index case was a returning traveler from the Middle East. The infection had spread within the hospital, and subsequently to other hospitals because of patient movement, resulting in nosocomial transmission at 16 clinics and hospitals." (Source: <https://pmc.ncbi.nlm.nih.gov/articles/PMC5840604/>).
+47% of all infections came from nosocomial transmission (Hospital Room Visits: 27%; Emergency Rooms: 20%). "The index case was a returning traveler from the Middle East. The infection had spread within the hospital, and subsequently to other hospitals because of patient movement, resulting in nosocomial transmission at 16 clinics and hospitals." (Source: <https://pmc.ncbi.nlm.nih.gov/articles/PMC5840604/>).
 
 ```{r}
 hospital_count <- linelist %>%
