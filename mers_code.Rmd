@@ -1,6 +1,7 @@
 ---
 title: "MERS-CoV Korea 2015 - Marta Smith"
 output:
+  pdf_document: default
   html_document: default
 date: "2025-12-01"
 geometry: margin=2cm
@@ -75,7 +76,6 @@ summary(mers_korea_2015)
 ```
 
 ```{r results='hide'}
-str(mers_korea_2015)
 describe(mers_korea_2015$linelist)
 describe(mers_korea_2015$contacts)
 ```
@@ -88,7 +88,6 @@ summary(mers_korea_2015$contacts)
 3.  How can one access the sub-items within the `mers_korea_2015`?
 
 ```{r results='hide'}
-# separating the data sets
 # different ways of accessing the sub-items
 mers_korea_2015$linelist
 mers_korea_2015[1]
@@ -146,49 +145,32 @@ contacts <- mers_korea_2015$contacts %>%
 ## Getting my hands dirty with the data
 
 ```{r}
-# frequency tables
-report_frequency <- linelist %>%
-  group_by(dt_report) %>%
-  summarise(
-    count = n()
-  )
-
-onset_frequency <- linelist %>%
-  group_by(dt_onset) %>%
-  summarise(
-    count = n() )
-
 # distribution of cases by onset and report dates
 ggplot(linelist) +
   geom_histogram(aes(x=dt_onset, fill="Onset Date"), alpha = 0.7, color="black") +
   geom_histogram(aes(x=dt_report, fill="Report Date"), alpha=0.6, color="black") +
   scale_fill_manual(values = c("Onset Date" = "purple",
                                "Report Date" = "yellow")) +
-  theme_minimal() + labs(x="", y="Frequency",
+  theme_minimal() + labs(x="", y="Cases",
                          title="Distribution of cases by Onset and Report Dates",
                          fill="") +
   theme(legend.position="top")
 ```
 
 ```{r results='hold'}
-# admissions grouped by sex and date of report
-frequency_by_sex <- linelist %>%
-  group_by(week_report, sex) %>%
-  summarise(
-    count = n(),
-    mean_age = mean(age, na.rm= TRUE),
-    .groups = 'drop'
-  )
-
-# understanding the cases by sex
-ggplot(frequency_by_sex, aes(x=week_report, y=count, color=sex)) +
-  geom_line(linewidth=1) + geom_point(size=2) + theme_minimal() +
-  labs(x="Week", y="Cases", color="Sex") 
-
-# mean age of infected by sex
-ggplot(frequency_by_sex, aes(x=week_report, y=mean_age, color=sex)) +
-  geom_line(linewidth=1) + geom_point(size=2) + theme_minimal() +
-  labs(x="Week", y="Mean Age of Infected", color="Sex")
+# admissions by sex
+linelist %>%
+  group_by(dt_report, sex) %>%
+  summarise(count = n(), .groups = 'drop') %>% 
+  
+  ggplot(aes(x = dt_report, y = count, color = sex, fill = sex)) +
+  geom_line(alpha = 0.3, size = 0.8) + 
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "loess", level=0.9, alpha = 0.2) +
+  coord_cartesian(ylim = c(0, NA)) +
+  theme_minimal() +
+  labs(title = "Cases vs Trend by Date of Report",
+       x = "", y = "Cases", color="Sex", fill="Sex")
 ```
 
 ```{r}
@@ -204,7 +186,7 @@ ggplot(linelist) +
 
 1.  Calculate the average age for patients with the outcome "Dead" and patients with the outcome "Alive."
 
-Average ages: Dead: 68 years old; Alive: 53.6 years old. The average age of this sample was 55 years old.
+Average ages: Dead: 68 years old; Alive: 53.6 years old. The average age of the sample was 55 years old.
 
 ```{r}
 # age distribution (not grouped)
@@ -264,7 +246,7 @@ In South Korea, the elderly population is comprised of individuals aged 65 and o
 
 Age seemed to be a determinant of mortality during the MERS-CoV outbreak in South Korea. The deceased group represents 11.7% of the dataset. The average age of the Dead group is 68 years old, 14.4 years higher than the Alive group (53.6). Also, the standard deviation for the Dead group is 56% lower with respect to the Alive group (8.9 vs 15.8). This shows that the data points in the Dead group are closer to the mean.
 
-47% of all infections came from nosocomial transmission (Hospital Room Visits: 27%; Emergency Rooms: 20%). "The index case was a returning traveler from the Middle East. The infection had spread within the hospital, and subsequently to other hospitals because of patient movement, resulting in nosocomial transmission at 16 clinics and hospitals." (Source: <https://pmc.ncbi.nlm.nih.gov/articles/PMC5840604/>).
+47% of all infections came from nosocomial transmission (Hospital Room Visits: 27%; Emergency Rooms: 20%) (Source: <https://pmc.ncbi.nlm.nih.gov/articles/PMC5840604/>).
 
 ```{r}
 hospital_count <- linelist %>%
